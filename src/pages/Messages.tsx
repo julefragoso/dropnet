@@ -13,23 +13,25 @@ const Messages = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-background text-foreground font-mono p-8">
+    <div className="min-h-screen bg-background text-foreground font-mono p-4 sm:p-8">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-2xl text-primary font-bold">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 sm:mb-8 gap-4">
+          <h1 className="text-xl sm:text-2xl text-primary font-bold">
             [ MESSAGE TERMINAL ]
           </h1>
-          <div className="flex gap-4">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
             <Button
               variant="terminal"
               onClick={() => navigate("/messages/compose")}
+              className="w-full sm:w-auto text-sm sm:text-base"
             >
               &gt; COMPOSE MESSAGE
             </Button>
             <Button
               variant="outline"
               onClick={() => navigate("/dashboard")}
+              className="w-full sm:w-auto text-sm sm:text-base"
             >
               &lt; BACK
             </Button>
@@ -40,22 +42,22 @@ const Messages = () => {
         <div className="space-y-4">
           {mockContacts.map((contact) => (
             <Card key={contact.id} className="bg-card border-2 border-primary hover:border-accent transition-colors cursor-pointer">
-              <div className="p-6">
+              <div className="p-4 sm:p-6">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <div className={`w-3 h-3 rounded-full ${
+                  <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
+                    <div className={`w-3 h-3 rounded-full flex-shrink-0 ${
                       contact.status === 'online' ? 'bg-accent' : 
                       contact.status === 'away' ? 'bg-destructive' : 'bg-muted-foreground'
                     }`}></div>
-                    <div>
-                      <div className="font-bold text-foreground">{contact.name}</div>
-                      <div className="text-sm text-muted-foreground">{contact.lastMessage}</div>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-bold text-foreground text-sm sm:text-base">{contact.name}</div>
+                      <div className="text-xs sm:text-sm text-muted-foreground truncate">{contact.lastMessage}</div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-sm text-muted-foreground">{contact.time}</div>
+                  <div className="text-right flex-shrink-0 ml-2">
+                    <div className="text-xs sm:text-sm text-muted-foreground">{contact.time}</div>
                     {contact.unread > 0 && (
-                      <div className="bg-destructive text-destructive-foreground text-xs px-2 py-1 rounded mt-1">
+                      <div className="bg-destructive text-destructive-foreground text-xs px-2 py-1 rounded mt-1 inline-block">
                         {contact.unread}
                       </div>
                     )}
