@@ -2,95 +2,88 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* Terminal/Hacker Design System - Deep Web Aesthetic */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Terminal color palette */
+    --terminal-black: 0 0% 0%;
+    --terminal-green: 120 100% 50%;
+    --terminal-red: 348 100% 55%;
+    --terminal-blue: 198 100% 60%;
+    --terminal-gray: 0 0% 20%;
+    --terminal-dark-gray: 0 0% 10%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    /* Core semantic tokens */
+    --background: var(--terminal-black);
+    --foreground: var(--terminal-green);
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --card: var(--terminal-dark-gray);
+    --card-foreground: var(--terminal-green);
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --popover: var(--terminal-black);
+    --popover-foreground: var(--terminal-green);
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --primary: var(--terminal-green);
+    --primary-foreground: var(--terminal-black);
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --secondary: var(--terminal-gray);
+    --secondary-foreground: var(--terminal-green);
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --muted: var(--terminal-dark-gray);
+    --muted-foreground: var(--terminal-green);
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --accent: var(--terminal-blue);
+    --accent-foreground: var(--terminal-black);
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --destructive: var(--terminal-red);
+    --destructive-foreground: var(--terminal-green);
 
-    --radius: 0.5rem;
+    --border: var(--terminal-green);
+    --input: var(--terminal-dark-gray);
+    --ring: var(--terminal-green);
 
-    --sidebar-background: 0 0% 98%;
+    --radius: 0rem;
 
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-background: var(--terminal-black);
+    --sidebar-foreground: var(--terminal-green);
+    --sidebar-primary: var(--terminal-green);
+    --sidebar-primary-foreground: var(--terminal-black);
+    --sidebar-accent: var(--terminal-dark-gray);
+    --sidebar-accent-foreground: var(--terminal-green);
+    --sidebar-border: var(--terminal-green);
+    --sidebar-ring: var(--terminal-green);
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Dark mode uses same terminal colors */
+    --background: var(--terminal-black);
+    --foreground: var(--terminal-green);
+    --card: var(--terminal-dark-gray);
+    --card-foreground: var(--terminal-green);
+    --popover: var(--terminal-black);
+    --popover-foreground: var(--terminal-green);
+    --primary: var(--terminal-green);
+    --primary-foreground: var(--terminal-black);
+    --secondary: var(--terminal-gray);
+    --secondary-foreground: var(--terminal-green);
+    --muted: var(--terminal-dark-gray);
+    --muted-foreground: var(--terminal-green);
+    --accent: var(--terminal-blue);
+    --accent-foreground: var(--terminal-black);
+    --destructive: var(--terminal-red);
+    --destructive-foreground: var(--terminal-green);
+    --border: var(--terminal-green);
+    --input: var(--terminal-dark-gray);
+    --ring: var(--terminal-green);
+    --sidebar-background: var(--terminal-black);
+    --sidebar-foreground: var(--terminal-green);
+    --sidebar-primary: var(--terminal-green);
+    --sidebar-primary-foreground: var(--terminal-black);
+    --sidebar-accent: var(--terminal-dark-gray);
+    --sidebar-accent-foreground: var(--terminal-green);
+    --sidebar-border: var(--terminal-green);
+    --sidebar-ring: var(--terminal-green);
   }
 }
 
@@ -100,6 +93,6 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-mono;
   }
 }
