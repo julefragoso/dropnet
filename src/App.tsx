@@ -11,7 +11,8 @@ import ComposeMessage from "./pages/ComposeMessage";
 import CreateNFT from "./pages/CreateNFT";
 import DropSpots from "./pages/DropSpots";
 import Collection from "./pages/Collection";
-import OnlineMode from "./pages/OnlineMode";
+import P2PExchange from "./pages/P2PExchange";
+import Panic from "./pages/Panic";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -31,10 +32,10 @@ const App = () => (
           <Route path="/nft/create" element={<CreateNFT />} />
           <Route path="/drops" element={<DropSpots />} />
           <Route path="/collection" element={<Collection />} />
-          <Route path="/online" element={<OnlineMode />} />
+          <Route path="/p2p" element={<P2PExchange />} />
           <Route path="/files" element={<Dashboard />} />
           <Route path="/settings" element={<Dashboard />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route path="/panic" element={<Panic />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

@@ -1,9 +1,17 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
+import PanicButton from "@/components/PanicButton";
+import { useState, useEffect } from "react";
+import { messageService } from "@/lib/messages/messageService";
+import { dbService } from "@/lib/storage/indexedDB";
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [nftCount, setNftCount] = useState(0);
+  const [dropSpotsCount, setDropSpotsCount] = useState(0);
+  const [loading, setLoading] = useState(true);
   
   const menuItems = [
     { id: 1, label: "CREATE MESSAGE", route: "/messages/compose", icon: "📝" },
@@ -12,9 +20,44 @@ const Dashboard = () => {
     { id: 4, label: "DROP SPOTS", route: "/drops", icon: "📍" },
     { id: 5, label: "MESSAGES", route: "/messages", icon: "💬" },
     { id: 6, label: "COLLECTION", route: "/collection", icon: "🗃️" },
-    { id: 7, label: "ONLINE MODE", route: "/online", icon: "🌐" },
+    { id: 7, label: "P2P EXCHANGE", route: "/p2p", icon: "📡" },
     { id: 8, label: "SETTINGS", route: "/settings", icon: "⚙️" },
   ];
+
+  // Load real data on component mount
+  useEffect(() => {
+    const loadSystemStatus = async () => {
+      try {
+        setLoading(true);
+        
+        // Load user identity
+        const identity = await dbService.get('identity', 'current');
+        
+        if (identity) {
+          // Initialize message service
+          await messageService.initialize();
+          
+          // Get unread message count
+          const unread = await messageService.getUnreadCount(identity.id);
+          setUnreadCount(unread);
+          
+          // Get NFT count (placeholder for now)
+          const nfts = await dbService.getAll('nfts');
+          setNftCount(nfts.length);
+          
+          // Get drop spots count (placeholder for now)
+          const dropSpots = await dbService.getAll('dropSpots');
+          setDropSpotsCount(dropSpots.length);
+        }
+      } catch (error) {
+        console.error('Error loading system status:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadSystemStatus();
+  }, []);
 
   return (
     <div className="min-h-screen bg-background text-foreground font-mono p-4 sm:p-8">
@@ -43,8 +86,7 @@ const Dashboard = () => {
               >
                 <div className="text-2xl sm:text-4xl">{item.icon}</div>
                 <div className="text-xs sm:text-lg font-bold text-foreground">
-                  <span className="block sm:inline">[{item.id}]</span>
-                  <span className="block sm:inline sm:ml-1">{item.label}</span>
+                  {item.label}
                 </div>
               </div>
             </Card>
@@ -57,25 +99,45 @@ const Dashboard = () => {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 text-sm">
             <div>
               <div className="text-muted-foreground mb-2">MESSAGES:</div>
-              <div className="text-primary font-bold">3 UNREAD</div>
+              <div className="text-primary font-bold">
+                {loading ? "LOADING..." : `${unreadCount} UNREAD`}
+              </div>
             </div>
             <div>
               <div className="text-muted-foreground mb-2">NFT COLLECTION:</div>
-              <div className="text-primary font-bold">12 ITEMS</div>
+              <div className="text-primary font-bold">
+                {loading ? "LOADING..." : `${nftCount} ITEMS`}
+              </div>
             </div>
             <div>
               <div className="text-muted-foreground mb-2">DROP SPOTS:</div>
-              <div className="text-primary font-bold">7 NEARBY</div>
+              <div className="text-primary font-bold">
+                {loading ? "LOADING..." : `${dropSpotsCount} NEARBY`}
+              </div>
             </div>
+          </div>
+          
+          {/* Security Section */}
+          <div className="mt-6 pt-4 border-t border-border">
+            <h3 className="text-sm text-accent font-bold mb-3">[ SECURITY CONTROLS ]</h3>
+            <div className="flex justify-center">
+              <PanicButton variant="inline" />
+            </div>
+            <p className="text-xs text-muted-foreground text-center mt-2">
+              EMERGENCY BUTTON - ACTIVATES PANIC MODE
+            </p>
           </div>
         </Card>
 
         {/* Footer Commands */}
         <div className="mt-6 sm:mt-8 text-center text-xs sm:text-sm text-muted-foreground">
-          <p className="hidden sm:block">TYPE NUMBER [1-8] TO SELECT OPTION | ESC TO EXIT</p>
+          <p className="hidden sm:block">CLICK TO SELECT OPTION</p>
           <p className="sm:hidden">TAP TO SELECT OPTION</p>
         </div>
       </div>
+      
+      {/* Panic Button - Floating */}
+      <PanicButton variant="floating" />
     </div>
   );
 };

@@ -6,32 +6,20 @@ const Welcome = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground font-mono flex flex-col items-center justify-center p-4 sm:p-8">
-      <div className="max-w-2xl w-full space-y-6 sm:space-y-8">
-        {/* ASCII Art Logo */}
-        <div className="text-center space-y-4">
-          <pre className="text-primary text-xs sm:text-sm md:text-base leading-tight overflow-x-auto">
-{`
- ▓█████▄ ▓█████ ▓█████  ██▓███  
- ▒██▀ ██▌▓█   ▀ ▓█   ▀ ▓██░  ██▒
- ░██   █▌▒███   ▒███   ▓██░ ██▓▒
- ░▓█▄   ▌▒▓█  ▄ ▒▓█  ▄ ▒██▄█▓▒ ▒
- ░▒████▓ ░▒████▒░▒████▒▒██▒ ░  ░
-  ▒▒▓  ▒ ░░ ▒░ ░░░ ▒░ ░▒▓▒░ ░  ░
-  ░ ▒  ▒  ░ ░  ░ ░ ░  ░░▒ ░    
-  ░ ░  ░    ░      ░   ░░       
-    ░       ░  ░   ░  ░         
-  ░                            
-   DEEP CONSOLE v1.0           
-`}
-          </pre>
-        </div>
+      {/* Simple Logo */}
+      <div className="text-center mb-8">
+        <h1 className="text-4xl text-primary font-bold mb-4">
+          DROPNET
+        </h1>
+        <p className="text-muted-foreground">
+          Decentralized Communication Terminal
+        </p>
+      </div>
 
-        {/* Main Message */}
+      {/* Main Message */}
+      <div className="max-w-lg w-full space-y-6 sm:space-y-8">
         <div className="text-center space-y-4 sm:space-y-6">
           <div className="border-2 border-primary p-4 sm:p-6 bg-card">
-            <h1 className="text-xl sm:text-2xl md:text-3xl text-primary font-bold mb-4">
-              DEEP CONSOLE v1.0
-            </h1>
             <p className="text-base sm:text-lg text-foreground mb-4 sm:mb-6">
               &gt; NO SERVERS. NO TRACES. NO PERMISSION.
             </p>
