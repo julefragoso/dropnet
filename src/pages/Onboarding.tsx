@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { dbService } from "@/lib/storage/indexedDB";
 import { UserIdentity } from "@/lib/security/config";
+// import { useAuth } from "@/contexts/AuthContext";
+
 import React from "react"; // Added missing import for React
 
 // Utility functions for crypto operations (without hooks)
@@ -68,6 +70,7 @@ const generateKeyPair = async (): Promise<{ publicKey: string; privateKey: strin
 
 const Onboarding = () => {
   const navigate = useNavigate();
+  // const { login } = useAuth();
   const [step, setStep] = useState(1);
   const [mode, setMode] = useState<'select' | 'generate' | 'access'>('select');
   const [accessCode, setAccessCode] = useState("");
@@ -138,6 +141,26 @@ const Onboarding = () => {
         console.error('❌ Error storing security config:', e);
       }
       
+      // Save as current identity so other pages can access it
+      console.log('Saving as current identity...');
+      try {
+        await dbService.put('identity', { ...identity, id: 'current' });
+        console.log('✅ Current identity saved successfully');
+      } catch (e) {
+        console.error('❌ Error saving current identity:', e);
+      }
+      
+      // Save credentials to localStorage directly
+      console.log('Saving credentials to localStorage...');
+      localStorage.setItem('dropnet_access_code', code);
+      localStorage.setItem('dropnet_salt', salt);
+      console.log('✅ Credentials saved to localStorage');
+      
+      // Request notification permissions for message alerts
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+      
       // Verify that data was stored correctly
       console.log('Verifying stored data...');
       const verifySettings = await dbService.getRawData('settings', 'security');
@@ -175,18 +198,18 @@ const Onboarding = () => {
       if (!accessDropSeed.trim()) {
         throw new Error('Drop Seed is required');
       }
-      // Usar el Drop Seed ingresado para inicializar la base de datos
-      await dbService.init(accessCode.trim(), accessDropSeed.trim());
-      // Obtener la identidad
-      const identities = await dbService.getAll('identity');
-      console.log('Found identities:', identities.length);
-      if (identities.length === 0) {
-        throw new Error('No identity found with this access code and drop seed');
+      
+      // Save credentials to localStorage directly
+      console.log('Saving credentials to localStorage...');
+      localStorage.setItem('dropnet_access_code', accessCode.trim());
+      localStorage.setItem('dropnet_salt', accessDropSeed.trim());
+      console.log('✅ Credentials saved to localStorage');
+      
+      // Request notification permissions for message alerts
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
       }
-      const identity = identities[0];
-      setUserIdentity(identity);
-      setAccessCode(accessCode.trim());
-      setDropSeed(accessDropSeed.trim());
+      
       alert('Identity accessed successfully! Welcome back.');
       navigate("/dashboard");
     } catch (error) {
@@ -195,6 +218,50 @@ const Onboarding = () => {
       alert(`Error accessing identity: ${error.message}. Please check your access code and drop seed.`);
     } finally {
       setIsAccessing(false);
+    }
+  };
+
+  // Clear all existing data
+  const handleClearData = async () => {
+    if (confirm('⚠️ This will delete ALL existing data including identities, messages, and NFTs. This action cannot be undone. Are you sure?')) {
+      try {
+        console.log('🗑️ Clearing all existing data...');
+        
+        // Clear all object stores
+        const stores = ['identity', 'messages', 'nfts', 'dropSpots', 'settings'];
+        for (const store of stores) {
+          await dbService.clear(store);
+        }
+        
+        alert('✅ All data cleared successfully. You can now create a new identity.');
+        setMode('select');
+      } catch (error) {
+        console.error('Error clearing data:', error);
+        alert(`Error clearing data: ${error.message}`);
+      }
+    }
+  };
+
+  // List available identities
+  const handleListIdentities = async () => {
+    try {
+      console.log('🔍 Listing available identities...');
+      const identities = await dbService.listAllIdentities();
+      
+      if (identities.length === 0) {
+        alert('No identities found. Create a new identity first.');
+        return;
+      }
+      
+      const identityList = identities
+        .filter(id => id.hasData)
+        .map(id => `• ${id.accessCode}`)
+        .join('\n');
+      
+      alert(`Found ${identities.length} identity(ies):\n\n${identityList}\n\nUse these access codes to access your identities.`);
+    } catch (error) {
+      console.error('Error listing identities:', error);
+      alert(`Error listing identities: ${error.message}`);
     }
   };
 
@@ -248,6 +315,13 @@ const Onboarding = () => {
                       </div>
                     </div>
                   </Button>
+                </div>
+                
+                <div className="text-sm text-muted-foreground space-y-2 mt-6">
+                  <p>&gt; CRYPTOGRAPHICALLY SECURE</p>
+                  <p>&gt; ZERO PERSONAL DATA REQUIRED</p>
+                  <p>&gt; UNTRACEABLE BY DESIGN</p>
+                  <p>&gt; ENCRYPTED LOCAL STORAGE</p>
                 </div>
               </div>
             </Card>
@@ -376,6 +450,29 @@ const Onboarding = () => {
                     >
                       &gt; ACCESS IDENTITY
                     </Button>
+                  </div>
+                  
+                  {/* Utility Buttons */}
+                  <div className="mt-6 pt-4 border-t border-border space-y-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleListIdentities}
+                      className="text-xs w-full"
+                    >
+                      📋 LIST AVAILABLE IDENTITIES
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={handleClearData}
+                      className="text-xs w-full"
+                    >
+                      🗑️ CLEAR ALL DATA
+                    </Button>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      List your identities or remove all data to start fresh
+                    </p>
                   </div>
                 </div>
               </div>

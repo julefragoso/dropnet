@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+// import { AuthProvider } from "./contexts/AuthContext";
 import Welcome from "./pages/Welcome";
 import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
@@ -12,6 +13,10 @@ import CreateNFT from "./pages/CreateNFT";
 import DropSpots from "./pages/DropSpots";
 import Collection from "./pages/Collection";
 import P2PExchange from "./pages/P2PExchange";
+import P2PTest from "./pages/P2PTest";
+import SecureMessagingTest from "./pages/SecureMessagingTest";
+import SimpleMessagingTest from "./pages/SimpleMessagingTest";
+import Debug from "./pages/Debug";
 import Panic from "./pages/Panic";
 import NotFound from "./pages/NotFound";
 
@@ -33,6 +38,10 @@ const App = () => (
           <Route path="/drops" element={<DropSpots />} />
           <Route path="/collection" element={<Collection />} />
           <Route path="/p2p" element={<P2PExchange />} />
+          <Route path="/p2p-test" element={<P2PTest />} />
+          <Route path="/secure-messaging" element={<SecureMessagingTest />} />
+          <Route path="/simple-messaging" element={<SimpleMessagingTest />} />
+          <Route path="/debug" element={<Debug />} />
           <Route path="/files" element={<Dashboard />} />
           <Route path="/settings" element={<Dashboard />} />
           <Route path="/panic" element={<Panic />} />

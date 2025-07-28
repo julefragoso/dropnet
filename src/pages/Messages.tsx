@@ -61,6 +61,20 @@ const Messages = () => {
     };
 
     loadMessages();
+
+    // Listen for new messages
+    const handleNewMessage = (event: CustomEvent) => {
+      console.log('New message received:', event.detail);
+      // Refresh conversations when new message arrives
+      loadMessages();
+    };
+
+    window.addEventListener('newMessage', handleNewMessage as EventListener);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('newMessage', handleNewMessage as EventListener);
+    };
   }, []);
 
   // Filter conversations based on search

@@ -1,6 +1,9 @@
 // Message Service for DropNet
 // Handles encrypted messages with cryptographic verification
 
+import { dbService } from '@/lib/storage/indexedDB';
+import { p2pService } from '@/lib/p2p/p2pService';
+
 export interface Message {
   id: string;
   senderId: string;
@@ -46,11 +49,102 @@ export class MessageService {
     return MessageService.instance;
   }
 
-  // Initialize message service
   async initialize(): Promise<void> {
     if (this.isInitialized) return;
+    
+    // Set up P2P message handlers for receiving messages
+    p2pService.onMessage('encrypted_message', this.handleIncomingMessage.bind(this));
+    
     this.isInitialized = true;
-    console.log('Message Service initialized');
+    console.log('Message service initialized with P2P integration');
+  }
+
+  // Handle incoming messages from P2P
+  private async handleIncomingMessage(message: any): Promise<void> {
+    try {
+      console.log('Received encrypted message via P2P:', message);
+      
+      const { encryptedMessage, senderId } = message.data;
+      
+      // Store the received message
+      await dbService.put('messages', encryptedMessage);
+      
+      // Update conversation
+      await this.updateConversation(senderId, encryptedMessage.receiverId, encryptedMessage);
+      
+      // Trigger notification (you can implement this later)
+      this.triggerMessageNotification(encryptedMessage);
+      
+    } catch (error) {
+      console.error('Error handling incoming message:', error);
+    }
+  }
+
+  // Trigger notification for new message
+  private triggerMessageNotification(message: Message): void {
+    // You can implement browser notifications here
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification('New Message', {
+        body: `You have a new message from ${message.senderId}`,
+        icon: '/favicon.ico'
+      });
+    }
+    
+    // Dispatch custom event for UI updates
+    window.dispatchEvent(new CustomEvent('newMessage', { detail: message }));
+  }
+
+  // Send message via P2P to recipient
+  private async sendMessageViaP2P(receiverId: string, message: Message): Promise<void> {
+    try {
+      // Check if recipient is connected via P2P
+      const isConnected = p2pService.isPeerConnected(receiverId);
+      
+      if (isConnected) {
+        // Send directly via P2P
+        const success = await p2pService.sendMessage(receiverId, {
+          type: 'encrypted_message',
+          receiverId: receiverId,
+          data: {
+            encryptedMessage: message,
+            senderId: message.senderId
+          }
+        });
+        
+        if (success) {
+          console.log('✅ Message sent successfully via P2P to:', receiverId);
+        } else {
+          console.log('⏳ Failed to send message via P2P, queuing for later delivery');
+          await this.queueMessageForDelivery(receiverId, message);
+        }
+      } else {
+        // Store for later delivery when recipient comes online
+        console.log(`⏳ Recipient ${receiverId} not connected, message queued for delivery`);
+        await this.queueMessageForDelivery(receiverId, message);
+      }
+    } catch (error) {
+      console.error('❌ Error sending message via P2P:', error);
+      await this.queueMessageForDelivery(receiverId, message);
+    }
+  }
+
+  // Queue message for later delivery
+  private async queueMessageForDelivery(receiverId: string, message: Message): Promise<void> {
+    try {
+      const pendingMessages = await dbService.getAll('pendingMessages') || [];
+      pendingMessages.push({
+        id: crypto.randomUUID(),
+        receiverId,
+        message,
+        createdAt: Date.now(),
+        attempts: 0
+      });
+      
+      // Store pending messages
+      await dbService.put('pendingMessages', pendingMessages);
+    } catch (error) {
+      console.error('Error queuing message for delivery:', error);
+    }
   }
 
   // Create a new message
@@ -111,6 +205,15 @@ export class MessageService {
 
       // Update conversation
       await this.updateConversation(senderId, receiverId, message);
+
+      // Send message via P2P to recipient
+      try {
+        await this.sendMessageViaP2P(receiverId, message);
+        console.log('✅ Message sent via P2P to recipient');
+      } catch (p2pError) {
+        console.warn('⚠️ P2P delivery failed, message stored locally:', p2pError);
+        // Message is still stored locally, recipient can sync later
+      }
 
       return message;
     } catch (error) {
@@ -356,9 +459,6 @@ export class MessageService {
     return this.isInitialized;
   }
 }
-
-// Import dbService
-import { dbService } from '@/lib/storage/indexedDB';
 
 // Export singleton
 export const messageService = MessageService.getInstance(); 

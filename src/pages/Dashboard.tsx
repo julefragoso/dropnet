@@ -4,10 +4,13 @@ import { useNavigate } from "react-router-dom";
 import PanicButton from "@/components/PanicButton";
 import { useState, useEffect } from "react";
 import { messageService } from "@/lib/messages/messageService";
+import { p2pService } from "@/lib/p2p/p2pService";
 import { dbService } from "@/lib/storage/indexedDB";
+import { useIdentity } from "@/hooks/useIdentity";
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const { currentIdentity } = useIdentity();
   const [unreadCount, setUnreadCount] = useState(0);
   const [nftCount, setNftCount] = useState(0);
   const [dropSpotsCount, setDropSpotsCount] = useState(0);
@@ -30,15 +33,27 @@ const Dashboard = () => {
       try {
         setLoading(true);
         
-        // Load user identity
-        const identity = await dbService.get('identity', 'current');
-        
-        if (identity) {
+        if (currentIdentity) {
+          // Initialize P2P service with real WebRTC
+          console.log('🔧 Initializing P2P service...');
+          console.log('📋 Identity:', {
+            id: currentIdentity.id,
+            nodeId: currentIdentity.nodeId
+          });
+          
+          await p2pService.initialize(
+            currentIdentity.id, 
+            currentIdentity.nodeId, 
+            currentIdentity.nodeId // Using nodeId as accessCode for now
+          );
+          
+          console.log('✅ P2P service initialized successfully');
+          
           // Initialize message service
           await messageService.initialize();
           
           // Get unread message count
-          const unread = await messageService.getUnreadCount(identity.id);
+          const unread = await messageService.getUnreadCount(currentIdentity.id);
           setUnreadCount(unread);
           
           // Get NFT count (placeholder for now)
@@ -57,7 +72,74 @@ const Dashboard = () => {
     };
 
     loadSystemStatus();
-  }, []);
+
+    // Listen for new messages to update counts
+    const handleNewMessage = () => {
+      loadSystemStatus();
+    };
+
+    window.addEventListener('newMessage', handleNewMessage as EventListener);
+
+    return () => {
+      window.removeEventListener('newMessage', handleNewMessage as EventListener);
+    };
+  }, [currentIdentity]);
+
+  // Demo function to simulate receiving a message
+  const simulateIncomingMessage = async () => {
+    if (!currentIdentity) return;
+    
+    try {
+      const demoMessage = {
+        id: crypto.randomUUID(),
+        senderId: 'demo-sender-123',
+        receiverId: currentIdentity.id,
+        content: 'This is a demo message to test the notification system! 🚀',
+        type: 'text' as const,
+        timestamp: Date.now(),
+        signature: 'demo-signature',
+        isRead: false,
+        isEncrypted: true,
+        metadata: {}
+      };
+
+      // Store the demo message
+      await dbService.put('messages', demoMessage);
+      
+      // Update conversation manually
+      const conversationId = [currentIdentity.id, 'demo-sender-123'].sort().join('_');
+      const conversations = await dbService.getAll('conversations');
+      let conversation = conversations.find(c => c.id === conversationId);
+
+      if (!conversation) {
+        conversation = {
+          id: conversationId,
+          participants: [currentIdentity.id, 'demo-sender-123'],
+          lastMessage: demoMessage,
+          unreadCount: 1,
+          createdAt: demoMessage.timestamp,
+          updatedAt: demoMessage.timestamp
+        };
+      } else {
+        conversation.lastMessage = demoMessage;
+        conversation.updatedAt = demoMessage.timestamp;
+        conversation.unreadCount++;
+      }
+
+      await dbService.put('conversations', conversation);
+      
+      // Trigger notification
+      window.dispatchEvent(new CustomEvent('newMessage', { detail: demoMessage }));
+      
+      // Refresh counts
+      const unread = await messageService.getUnreadCount(currentIdentity.id);
+      setUnreadCount(unread);
+      
+      console.log('✅ Demo message received!');
+    } catch (error) {
+      console.error('Error creating demo message:', error);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground font-mono p-4 sm:p-8">

@@ -6,76 +6,58 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { messageService, MessageDraft } from "@/lib/messages/messageService";
+import { messageService } from "@/lib/messages/messageService";
 import { nftService } from "@/lib/nft/nftService";
-import { dbService } from "@/lib/storage/indexedDB";
 import { NFTContent } from "@/lib/nft/types";
 import { useCrypto } from "@/hooks/useCrypto";
-import { 
-  Send, 
-  FileText, 
-  Image, 
-  Package, 
-  Shield, 
-  AlertCircle,
-  CheckCircle,
-  XCircle
-} from "lucide-react";
+import { useIdentity } from "@/hooks/useIdentity";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Send, FileText, Image, AlertCircle, CheckCircle, Package, Shield } from "lucide-react";
 
 const ComposeMessage = () => {
   const navigate = useNavigate();
+  const { currentIdentity, loading, error } = useIdentity();
   const [messageType, setMessageType] = useState<'text' | 'file' | 'nft'>('text');
   const [receiverId, setReceiverId] = useState('');
   const [content, setContent] = useState('');
   const [selectedNFT, setSelectedNFT] = useState<string>('');
   const [userNFTs, setUserNFTs] = useState<NFTContent[]>([]);
-  const [userIdentity, setUserIdentity] = useState<any>(null);
   const [isSending, setIsSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [sendError, setSendError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
   const { generateKeyPair } = useCrypto();
 
-  // Load data on mount
+  // Load user NFTs when identity is available
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        // Load user identity
-        const identity = await dbService.get('identity', 'current');
-        setUserIdentity(identity);
-
-        if (!identity) {
-          setError('No user identity found. Please complete onboarding first.');
-          return;
+    const loadNFTs = async () => {
+      if (currentIdentity) {
+        try {
+          const nfts = await nftService.getUserNFTs(currentIdentity.id);
+          setUserNFTs(nfts);
+        } catch (error) {
+          console.error('Error loading NFTs:', error);
         }
-
-        // Load user NFTs
-        const nfts = await nftService.getUserNFTs(identity.id);
-        setUserNFTs(nfts);
-
-      } catch (error) {
-        console.error('Error loading data:', error);
-        setError('Failed to load user data');
       }
     };
 
-    loadData();
-  }, []);
+    loadNFTs();
+  }, [currentIdentity]);
 
   const handleSendMessage = async () => {
-    if (!userIdentity) {
-      setError('No user identity found. Please complete onboarding first.');
+    if (!currentIdentity) {
+      setSendError('No user identity found. Please complete onboarding first.');
       return;
     }
 
     if (!receiverId.trim() || !content.trim()) {
-      setError('Please fill in all required fields');
+      setSendError('Please fill in all required fields');
       return;
     }
 
     try {
       setIsSending(true);
-      setError(null);
+      setSendError(null);
       setSuccess(null);
 
       // Generate new key pair for this message
@@ -102,7 +84,7 @@ const ComposeMessage = () => {
 
       // Create and send message
       const message = await messageService.createMessage(
-        userIdentity.id,
+        currentIdentity.id,
         receiverId.trim(),
         content,
         messageType,
@@ -125,7 +107,7 @@ const ComposeMessage = () => {
 
     } catch (error) {
       console.error('Error sending message:', error);
-      setError('Failed to send message. Please try again.');
+      setSendError('Failed to send message. Please try again.');
     } finally {
       setIsSending(false);
     }
@@ -162,21 +144,29 @@ const ComposeMessage = () => {
 
         {/* Message Form */}
         <Card className="bg-card border-2 border-primary p-8">
-          <div className="space-y-6">
-            {/* Error/Success Messages */}
-            {error && (
-              <div className="bg-destructive/10 border border-destructive text-destructive p-4 rounded flex items-center gap-2">
-                <AlertCircle className="w-4 h-4" />
-                {error}
-              </div>
-            )}
+                      <div className="space-y-6">
+              {/* Identity Error */}
+              {error && (
+               <div className="bg-destructive/10 border border-destructive text-destructive p-4 rounded flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4" />
+                  {error}
+               </div>
+              )}
+              
+              {/* Error/Success Messages */}
+              {sendError && (
+               <div className="bg-destructive/10 border border-destructive text-destructive p-4 rounded flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4" />
+                  {sendError}
+               </div>
+              )}
 
-            {success && (
-              <div className="bg-green-500/10 border border-green-500 text-green-500 p-4 rounded flex items-center gap-2">
-                <CheckCircle className="w-4 h-4" />
-                {success}
-              </div>
-            )}
+                          {success && (
+               <div className="bg-green-500/10 border border-green-500 text-green-500 p-4 rounded flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4" />
+                  {success}
+               </div>
+              )}
 
             {/* Message Type Selection */}
             <div>

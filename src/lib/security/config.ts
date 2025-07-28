@@ -58,7 +58,9 @@ export const DB_SCHEMAS = {
   nfts: 'nfts',
   messages: 'messages',
   dropSpots: 'dropSpots',
-  settings: 'settings'
+  settings: 'settings',
+  pendingMessages: 'pendingMessages',
+  conversations: 'conversations'
 } as const;
 
 export type DBSchema = typeof DB_SCHEMAS[keyof typeof DB_SCHEMAS]; 

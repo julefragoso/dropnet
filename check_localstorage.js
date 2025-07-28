@@ -1,0 +1,1 @@
+console.log('localStorage contents:'); console.log('dropnet_access_code:', localStorage.getItem('dropnet_access_code')); console.log('dropnet_salt:', localStorage.getItem('dropnet_salt')); console.log('All localStorage keys:', Object.keys(localStorage));

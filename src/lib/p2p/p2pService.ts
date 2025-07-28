@@ -1,6 +1,8 @@
 // P2P Service for DropNet
 // Handles direct device-to-device communication using WebRTC
 
+import { io, Socket } from 'socket.io-client';
+
 export interface P2PConnection {
   id: string;
   peerId: string;
@@ -12,7 +14,7 @@ export interface P2PConnection {
 
 export interface P2PMessage {
   id: string;
-  type: 'nft_offer' | 'nft_accept' | 'nft_reject' | 'message' | 'ping' | 'pong';
+  type: 'nft_offer' | 'nft_accept' | 'nft_reject' | 'message' | 'ping' | 'pong' | 'encrypted_message' | 'secure_message';
   senderId: string;
   receiverId: string;
   timestamp: number;
@@ -27,13 +29,26 @@ export interface NFTTransferOffer {
   expiresAt: number;
 }
 
+export interface PeerInfo {
+  nodeId: string;
+  accessCode: string;
+}
+
 export class P2PService {
   private static instance: P2PService;
   private connections: Map<string, P2PConnection> = new Map();
   private localPeerId: string = '';
+  private localNodeId: string = '';
   private isInitialized: boolean = false;
   private messageHandlers: Map<string, (message: P2PMessage) => void> = new Map();
   private onConnectionChange?: (connections: P2PConnection[]) => void;
+  private onPeerListChange?: (peers: PeerInfo[]) => void;
+  
+  // Socket.io connection to signaling server
+  private socket: Socket | null = null;
+  private signalingServerUrl: string = process.env.NODE_ENV === 'production' 
+    ? 'https://dropnet-signaling.vercel.app' 
+    : 'http://localhost:3001';
 
   // WebRTC configuration
   private rtcConfig: RTCConfiguration = {
@@ -53,62 +68,91 @@ export class P2PService {
     return P2PService.instance;
   }
 
-  // Initialize P2P service
-  async initialize(peerId: string): Promise<void> {
+  // Initialize P2P service with real WebRTC
+  async initialize(peerId: string, nodeId: string, accessCode: string): Promise<void> {
     if (this.isInitialized) return;
 
     this.localPeerId = peerId;
+    this.localNodeId = nodeId;
     this.isInitialized = true;
 
-    // Start discovery
-    this.startDiscovery();
+    // Connect to signaling server
+    await this.connectToSignalingServer(accessCode);
     
-    console.log('P2P Service initialized with peer ID:', peerId);
+    console.log('🔗 P2P Service initialized with real WebRTC');
+    console.log('📡 Connected to signaling server');
   }
 
-  // Generate unique peer ID
-  generatePeerId(): string {
-    return `peer_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`;
+  // Connect to signaling server
+  private async connectToSignalingServer(accessCode: string): Promise<void> {
+    try {
+      this.socket = io(this.signalingServerUrl);
+
+      this.socket.on('connect', () => {
+        console.log('✅ Connected to signaling server');
+        console.log('📝 Registering with nodeId:', this.localNodeId);
+        
+        // Register with the signaling server
+        this.socket?.emit('register', {
+          nodeId: this.localNodeId,
+          accessCode: accessCode
+        });
+      });
+
+      this.socket.on('disconnect', () => {
+        console.log('❌ Disconnected from signaling server');
+      });
+
+      // Handle peer list updates
+      this.socket.on('peerList', (peers: PeerInfo[]) => {
+        console.log('📋 Available peers:', peers);
+        console.log('🔍 Current local node ID:', this.localNodeId);
+        this.onPeerListChange?.(peers);
+        
+        // Try to connect to new peers
+        peers.forEach(peer => {
+          if (peer.nodeId !== this.localNodeId) {
+            console.log('🔗 Attempting to connect to peer:', peer.nodeId);
+            this.connectToPeer(peer.nodeId);
+          } else {
+            console.log('⏭️ Skipping self-connection to:', peer.nodeId);
+          }
+        });
+      });
+
+      // Handle WebRTC signaling
+      this.socket.on('offer', async (data: { fromNodeId: string; offer: RTCSessionDescriptionInit }) => {
+        console.log('📥 Received offer from:', data.fromNodeId);
+        await this.handleOffer(data.fromNodeId, data.offer);
+      });
+
+      this.socket.on('answer', async (data: { fromNodeId: string; answer: RTCSessionDescriptionInit }) => {
+        console.log('📥 Received answer from:', data.fromNodeId);
+        await this.handleAnswer(data.fromNodeId, data.answer);
+      });
+
+      this.socket.on('iceCandidate', async (data: { fromNodeId: string; candidate: RTCIceCandidateInit }) => {
+        console.log('📥 Received ICE candidate from:', data.fromNodeId);
+        await this.handleIceCandidate(data.fromNodeId, data.candidate);
+      });
+
+      // Request initial peer list
+      this.socket.emit('getPeers');
+
+    } catch (error) {
+      console.error('❌ Error connecting to signaling server:', error);
+    }
   }
 
-  // Start peer discovery
-  private startDiscovery(): void {
-    // In a real implementation, this would use:
-    // - Bluetooth Low Energy (BLE)
-    // - Wi-Fi Direct
-    // - Local network discovery
-    // - QR codes for manual connection
-    
-    console.log('Starting peer discovery...');
-    
-    // For now, we'll simulate discovery
-    setInterval(() => {
-      this.simulatePeerDiscovery();
-    }, 10000); // Check every 10 seconds
-  }
-
-  // Simulate peer discovery (for demo purposes)
-  private simulatePeerDiscovery(): void {
-    // In a real app, this would discover actual nearby devices
-    const mockPeers = [
-      { id: 'peer_1234567890abcdef', name: 'Nearby Device 1' },
-      { id: 'peer_abcdef1234567890', name: 'Nearby Device 2' }
-    ];
-
-    mockPeers.forEach(peer => {
-      if (!this.connections.has(peer.id)) {
-        this.connectToPeer(peer.id);
-      }
-    });
-  }
-
-  // Connect to a peer
-  async connectToPeer(peerId: string): Promise<P2PConnection | null> {
-    if (this.connections.has(peerId)) {
-      return this.connections.get(peerId)!;
+  // Connect to a peer using WebRTC
+  async connectToPeer(peerNodeId: string): Promise<P2PConnection | null> {
+    if (this.connections.has(peerNodeId)) {
+      return this.connections.get(peerNodeId)!;
     }
 
     try {
+      console.log('🔗 Initiating connection to peer:', peerNodeId);
+      
       const connection = new RTCPeerConnection(this.rtcConfig);
       
       // Create data channel
@@ -118,7 +162,7 @@ export class P2PService {
 
       const p2pConnection: P2PConnection = {
         id: crypto.randomUUID(),
-        peerId,
+        peerId: peerNodeId,
         connection,
         dataChannel: null,
         isConnected: false,
@@ -129,34 +173,109 @@ export class P2PService {
       this.setupConnectionHandlers(p2pConnection, dataChannel);
 
       // Store connection
-      this.connections.set(peerId, p2pConnection);
+      this.connections.set(peerNodeId, p2pConnection);
 
-      // Create offer
+      // Create and send offer
       const offer = await connection.createOffer();
       await connection.setLocalDescription(offer);
 
-      // In a real implementation, you would exchange this offer/answer
-      // through a signaling server or direct connection method
-      console.log('Connection offer created for peer:', peerId);
+      // Send offer through signaling server
+      this.socket?.emit('offer', {
+        targetNodeId: peerNodeId,
+        offer: offer
+      });
 
+      console.log('📤 Sent offer to peer:', peerNodeId);
       return p2pConnection;
     } catch (error) {
-      console.error('Error connecting to peer:', error);
+      console.error('❌ Error connecting to peer:', error);
       return null;
+    }
+  }
+
+  // Handle incoming offer
+  private async handleOffer(fromNodeId: string, offer: RTCSessionDescriptionInit): Promise<void> {
+    try {
+      let connection = this.connections.get(fromNodeId);
+      
+      if (!connection) {
+        // Create new connection for incoming offer
+        const rtcConnection = new RTCPeerConnection(this.rtcConfig);
+        
+        connection = {
+          id: crypto.randomUUID(),
+          peerId: fromNodeId,
+          connection: rtcConnection,
+          dataChannel: null,
+          isConnected: false,
+          lastSeen: Date.now()
+        };
+
+        // Set up data channel for incoming connection
+        rtcConnection.ondatachannel = (event) => {
+          const dataChannel = event.channel;
+          this.setupConnectionHandlers(connection!, dataChannel);
+        };
+
+        this.connections.set(fromNodeId, connection);
+      }
+
+      // Set remote description
+      await connection.connection.setRemoteDescription(new RTCSessionDescription(offer));
+
+      // Create and send answer
+      const answer = await connection.connection.createAnswer();
+      await connection.connection.setLocalDescription(answer);
+
+      // Send answer through signaling server
+      this.socket?.emit('answer', {
+        targetNodeId: fromNodeId,
+        answer: answer
+      });
+
+      console.log('📤 Sent answer to peer:', fromNodeId);
+    } catch (error) {
+      console.error('❌ Error handling offer:', error);
+    }
+  }
+
+  // Handle incoming answer
+  private async handleAnswer(fromNodeId: string, answer: RTCSessionDescriptionInit): Promise<void> {
+    try {
+      const connection = this.connections.get(fromNodeId);
+      if (connection) {
+        await connection.connection.setRemoteDescription(new RTCSessionDescription(answer));
+        console.log('✅ Answer processed for peer:', fromNodeId);
+      }
+    } catch (error) {
+      console.error('❌ Error handling answer:', error);
+    }
+  }
+
+  // Handle incoming ICE candidate
+  private async handleIceCandidate(fromNodeId: string, candidate: RTCIceCandidateInit): Promise<void> {
+    try {
+      const connection = this.connections.get(fromNodeId);
+      if (connection) {
+        await connection.connection.addIceCandidate(new RTCIceCandidate(candidate));
+        console.log('✅ ICE candidate added for peer:', fromNodeId);
+      }
+    } catch (error) {
+      console.error('❌ Error handling ICE candidate:', error);
     }
   }
 
   // Set up connection event handlers
   private setupConnectionHandlers(connection: P2PConnection, dataChannel: RTCDataChannel): void {
     dataChannel.onopen = () => {
-      console.log('Data channel opened with peer:', connection.peerId);
+      console.log('✅ Data channel opened with peer:', connection.peerId);
       connection.isConnected = true;
       connection.dataChannel = dataChannel;
       this.onConnectionChange?.(Array.from(this.connections.values()));
     };
 
     dataChannel.onclose = () => {
-      console.log('Data channel closed with peer:', connection.peerId);
+      console.log('❌ Data channel closed with peer:', connection.peerId);
       connection.isConnected = false;
       connection.dataChannel = null;
       this.onConnectionChange?.(Array.from(this.connections.values()));
@@ -167,30 +286,39 @@ export class P2PService {
         const message: P2PMessage = JSON.parse(event.data);
         this.handleIncomingMessage(message);
       } catch (error) {
-        console.error('Error parsing incoming message:', error);
+        console.error('❌ Error parsing incoming message:', error);
       }
     };
 
     connection.connection.onicecandidate = (event) => {
       if (event.candidate) {
-        // In a real implementation, send this candidate to the peer
-        console.log('ICE candidate generated');
+        // Send ICE candidate through signaling server
+        this.socket?.emit('iceCandidate', {
+          targetNodeId: connection.peerId,
+          candidate: event.candidate
+        });
       }
     };
 
     connection.connection.onconnectionstatechange = () => {
-      console.log('Connection state changed:', connection.connection.connectionState);
+      console.log('🔄 Connection state changed for', connection.peerId, ':', connection.connection.connectionState);
     };
   }
 
   // Handle incoming messages
   private handleIncomingMessage(message: P2PMessage): void {
-    console.log('Received P2P message:', message);
+    console.log('📨 Received P2P message:', message);
 
     // Update last seen
     const connection = this.connections.get(message.senderId);
     if (connection) {
       connection.lastSeen = Date.now();
+    }
+
+    // Handle secure messages
+    if (message.type === 'secure_message') {
+      this.handleSecureMessage(message);
+      return;
     }
 
     // Route message to appropriate handler
@@ -200,11 +328,28 @@ export class P2PService {
     }
   }
 
+  // Handle incoming secure messages
+  private async handleSecureMessage(message: P2PMessage): Promise<void> {
+    try {
+      console.log('🔐 Processing secure message from:', message.senderId);
+      
+      // Import secure messaging service dynamically
+      const { secureMessagingService } = await import('./secureMessaging');
+      
+      // Process the secure message
+      await secureMessagingService.processIncomingMessage(message.data);
+      
+      console.log('✅ Secure message processed successfully');
+    } catch (error) {
+      console.error('❌ Error processing secure message:', error);
+    }
+  }
+
   // Send message to peer
   async sendMessage(peerId: string, message: Omit<P2PMessage, 'id' | 'senderId' | 'timestamp'>): Promise<boolean> {
     const connection = this.connections.get(peerId);
     if (!connection || !connection.isConnected || !connection.dataChannel) {
-      console.error('No active connection to peer:', peerId);
+      console.error('❌ No active connection to peer:', peerId);
       return false;
     }
 
@@ -212,14 +357,15 @@ export class P2PService {
       const fullMessage: P2PMessage = {
         ...message,
         id: crypto.randomUUID(),
-        senderId: this.localPeerId,
+        senderId: this.localNodeId,
         timestamp: Date.now()
       };
 
       connection.dataChannel.send(JSON.stringify(fullMessage));
+      console.log('📤 Sent message to peer:', peerId);
       return true;
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error('❌ Error sending message:', error);
       return false;
     }
   }
@@ -280,6 +426,11 @@ export class P2PService {
     this.onConnectionChange = callback;
   }
 
+  // Set peer list change callback
+  setPeerListChangeCallback(callback: (peers: PeerInfo[]) => void): void {
+    this.onPeerListChange = callback;
+  }
+
   // Get all connections
   getConnections(): P2PConnection[] {
     return Array.from(this.connections.values());
@@ -290,6 +441,12 @@ export class P2PService {
     return Array.from(this.connections.values())
       .filter(conn => conn.isConnected)
       .map(conn => conn.peerId);
+  }
+
+  // Check if a peer is connected
+  isPeerConnected(peerId: string): boolean {
+    const connection = this.connections.get(peerId);
+    return connection ? connection.isConnected : false;
   }
 
   // Disconnect from peer
@@ -316,6 +473,11 @@ export class P2PService {
     return this.localPeerId;
   }
 
+  // Get local node ID
+  getLocalNodeId(): string {
+    return this.localNodeId;
+  }
+
   // Check if service is initialized
   isServiceInitialized(): boolean {
     return this.isInitialized;
@@ -331,6 +493,23 @@ export class P2PService {
         this.disconnectFromPeer(peerId);
       }
     });
+  }
+
+  // Request peer list from signaling server
+  requestPeerList(): void {
+    if (this.socket && this.socket.connected) {
+      console.log('📡 Requesting peer list from signaling server...');
+      this.socket.emit('getPeers');
+    } else {
+      console.log('❌ Socket not connected, cannot request peer list');
+    }
+  }
+
+  // Disconnect from signaling server
+  disconnect(): void {
+    this.socket?.disconnect();
+    this.disconnectAll();
+    this.isInitialized = false;
   }
 }
 

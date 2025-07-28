@@ -13,10 +13,13 @@ export class IndexedDBService {
 
   // Initialize database
   async init(accessCode: string, salt: string): Promise<void> {
+    // Create a unique database name for each identity
+    const uniqueDbName = `${SECURITY_CONFIG.DB_NAME}_${accessCode}`;
+    
     console.log('Initializing database with:', {
       accessCode: accessCode.substring(0, 4) + '...',
       salt: salt.substring(0, 4) + '...',
-      dbName: SECURITY_CONFIG.DB_NAME,
+      dbName: uniqueDbName,
       dbVersion: SECURITY_CONFIG.DB_VERSION
     });
     
@@ -29,7 +32,7 @@ export class IndexedDBService {
     this.salt = salt;
 
     return new Promise((resolve, reject) => {
-      const request = indexedDB.open(SECURITY_CONFIG.DB_NAME, SECURITY_CONFIG.DB_VERSION);
+      const request = indexedDB.open(uniqueDbName, SECURITY_CONFIG.DB_VERSION);
 
       request.onerror = () => {
         console.error('Database initialization error:', request.error);
@@ -248,38 +251,43 @@ export class IndexedDBService {
 
   // Decrypt data after retrieving
   private async decryptData(encryptedData: EncryptedData): Promise<any> {
-    const keyMaterial = await crypto.subtle.importKey(
-      'raw',
-      new TextEncoder().encode(this.accessCode),
-      { name: 'PBKDF2' },
-      false,
-      ['deriveBits', 'deriveKey']
-    );
+    try {
+      const keyMaterial = await crypto.subtle.importKey(
+        'raw',
+        new TextEncoder().encode(this.accessCode),
+        { name: 'PBKDF2' },
+        false,
+        ['deriveBits', 'deriveKey']
+      );
 
-    const key = await crypto.subtle.deriveKey(
-      {
-        name: 'PBKDF2',
-        salt: this.base64ToArrayBuffer(this.salt), // Use the salt from initialization
-        iterations: SECURITY_CONFIG.PBKDF2_ITERATIONS,
-        hash: 'SHA-256'
-      },
-      keyMaterial,
-      { name: 'AES-GCM', length: 256 },
-      false,
-      ['encrypt', 'decrypt']
-    );
+      const key = await crypto.subtle.deriveKey(
+        {
+          name: 'PBKDF2',
+          salt: this.base64ToArrayBuffer(this.salt), // Use the salt from initialization
+          iterations: SECURITY_CONFIG.PBKDF2_ITERATIONS,
+          hash: 'SHA-256'
+        },
+        keyMaterial,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['encrypt', 'decrypt']
+      );
 
-    const iv = this.base64ToArrayBuffer(encryptedData.iv);
-    const encryptedBuffer = this.base64ToArrayBuffer(encryptedData.data);
-    
-    const decryptedBuffer = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv },
-      key,
-      encryptedBuffer
-    );
+      const iv = this.base64ToArrayBuffer(encryptedData.iv);
+      const encryptedBuffer = this.base64ToArrayBuffer(encryptedData.data);
+      
+      const decryptedBuffer = await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv },
+        key,
+        encryptedBuffer
+      );
 
-    const decryptedString = new TextDecoder().decode(decryptedBuffer);
-    return JSON.parse(decryptedString);
+      const decryptedString = new TextDecoder().decode(decryptedBuffer);
+      return JSON.parse(decryptedString);
+    } catch (error) {
+      console.error('❌ Decryption failed:', error);
+      throw new Error(`Decryption failed: ${error.message}`);
+    }
   }
 
   // Utility functions
@@ -354,22 +362,37 @@ export class IndexedDBService {
   async get(storeName: string, id: string): Promise<any> {
     if (!this.db) throw new Error('Database not initialized');
 
+    console.log(`🔍 Getting data from ${storeName} with id: ${id}`);
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction([storeName], 'readonly');
       const store = transaction.objectStore(storeName);
       const request = store.get(id);
 
       request.onsuccess = () => {
+        console.log(`🔍 Request result for ${storeName}:${id}:`, request.result);
+        
         if (request.result) {
+          console.log(`🔐 Decrypting data for ${storeName}:${id}...`);
           // Decrypt data after retrieving
           this.decryptData(request.result.encryptedData)
-            .then(resolve)
-            .catch(reject);
+            .then(decryptedData => {
+              console.log(`✅ Successfully decrypted data for ${storeName}:${id}:`, decryptedData);
+              resolve(decryptedData);
+            })
+            .catch(decryptError => {
+              console.error(`❌ Decryption failed for ${storeName}:${id}:`, decryptError);
+              reject(decryptError);
+            });
         } else {
+          console.log(`⚠️ No data found for ${storeName}:${id}`);
           resolve(null);
         }
       };
-      request.onerror = () => reject(request.error);
+      request.onerror = () => {
+        console.error(`❌ Error getting data from ${storeName}:${id}:`, request.error);
+        reject(request.error);
+      };
     });
   }
 
@@ -459,6 +482,58 @@ export class IndexedDBService {
       this.db.close();
       this.db = null;
     }
+  }
+
+  // List all available identities
+  async listAllIdentities(): Promise<Array<{accessCode: string, hasData: boolean}>> {
+    try {
+      console.log('🔍 Listing all available identities...');
+      
+      // Get all database names from IndexedDB
+      const databases = await indexedDB.databases();
+      const dropnetDatabases = databases.filter(db => 
+        db.name && db.name.startsWith(SECURITY_CONFIG.DB_NAME)
+      );
+      
+      console.log('Found DropNet databases:', dropnetDatabases.length);
+      
+      const identities: Array<{accessCode: string, hasData: boolean}> = [];
+      
+      for (const dbInfo of dropnetDatabases) {
+        if (dbInfo.name) {
+          // Extract access code from database name
+          const accessCode = dbInfo.name.replace(`${SECURITY_CONFIG.DB_NAME}_`, '');
+          
+          // Try to check if this database has any data
+          try {
+            // Temporarily initialize with this access code
+            const tempService = new IndexedDBService();
+            await tempService.init(accessCode, '');
+            const identityData = await tempService.getAllRawData('identity');
+            tempService.close();
+            
+            identities.push({
+              accessCode,
+              hasData: identityData.length > 0
+            });
+          } catch (error) {
+            console.log(`Could not access database for ${accessCode}:`, error.message);
+          }
+        }
+      }
+      
+      console.log('Available identities:', identities);
+      return identities;
+      
+    } catch (error) {
+      console.error('Error listing identities:', error);
+      return [];
+    }
+  }
+
+  // Check if database is initialized
+  isInitialized(): boolean {
+    return this.db !== null;
   }
 }
 
