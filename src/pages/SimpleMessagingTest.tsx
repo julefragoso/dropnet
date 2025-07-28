@@ -3,11 +3,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { useIdentity } from '@/hooks/useIdentity';
 import { simpleMessagingService, SimpleMessage } from '@/lib/p2p/simpleMessaging';
 
 const SimpleMessagingTest = () => {
-  const { currentIdentity, loading, error } = useIdentity();
+  const [currentUserId, setCurrentUserId] = useState('');
   const [recipientId, setRecipientId] = useState('');
   const [messageText, setMessageText] = useState('');
   const [messages, setMessages] = useState<SimpleMessage[]>([]);
@@ -18,21 +17,21 @@ const SimpleMessagingTest = () => {
     setLogs(prev => [...prev, `${new Date().toLocaleTimeString()}: ${message}`]);
   };
 
-  // Initialize simple messaging when identity is loaded
+  // Initialize simple messaging when user ID is set
   useEffect(() => {
-    if (currentIdentity && !loading) {
+    if (currentUserId) {
       initializeSimpleMessaging();
     }
-  }, [currentIdentity, loading]);
+  }, [currentUserId]);
 
   const initializeSimpleMessaging = async () => {
-    if (!currentIdentity) return;
+    if (!currentUserId) return;
 
     try {
       addLog('📨 Initializing simple messaging...');
       
       // Initialize simple messaging service
-      simpleMessagingService.initialize(currentIdentity.id);
+      simpleMessagingService.initialize(currentUserId);
       
       // Set up message handlers
       simpleMessagingService.onMessage('text', (message) => {
@@ -99,28 +98,27 @@ const SimpleMessagingTest = () => {
     setLogs([]);
   };
 
-  // Show loading state
-  if (loading) {
+  // Show user ID input if not set
+  if (!currentUserId) {
     return (
       <div className="container mx-auto p-6">
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
-            <h2 className="text-2xl font-bold mb-4">🔄 Loading...</h2>
-            <p className="text-muted-foreground">Initializing simple messaging system</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Show not authenticated state
-  if (!currentIdentity) {
-    return (
-      <div className="container mx-auto p-6">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold mb-4">⚠️ Not Authenticated</h2>
-            <p className="text-muted-foreground">Please go to the <a href="/onboarding" className="text-primary underline">Onboarding page</a> to create or access your identity.</p>
+            <h2 className="text-2xl font-bold mb-4">📝 Enter Your User ID</h2>
+            <div className="max-w-md mx-auto space-y-4">
+              <Input
+                value={currentUserId}
+                onChange={(e) => setCurrentUserId(e.target.value)}
+                placeholder="Enter your user ID (e.g., ALICE, BOB)"
+                className="text-center"
+              />
+              <Button 
+                onClick={() => setCurrentUserId(currentUserId || 'USER_' + Math.random().toString(36).substr(2, 5))}
+                className="w-full"
+              >
+                🚀 Start Messaging
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -132,7 +130,7 @@ const SimpleMessagingTest = () => {
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-2">📨 Simple Messaging Test</h1>
         <p className="text-muted-foreground">
-          Test messaging between browser tabs with your identity: <strong>{currentIdentity.id}</strong>
+          Test messaging between browser tabs with your ID: <strong>{currentUserId}</strong>
         </p>
         <p className="text-sm text-muted-foreground mt-2">
           💡 <strong>How to test:</strong> Open this page in two different browser tabs with different user IDs, 
@@ -184,7 +182,7 @@ const SimpleMessagingTest = () => {
                   <div
                     key={message.id}
                     className={`p-3 rounded-lg border ${
-                      message.senderId === currentIdentity.id
+                      message.senderId === currentUserId
                         ? 'bg-primary text-primary-foreground ml-4'
                         : 'bg-muted mr-4'
                     }`}
