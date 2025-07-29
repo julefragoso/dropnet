@@ -70,8 +70,8 @@ export class SimpleMessagingService {
       
       localStorage.setItem(this.storageKey, JSON.stringify(existingMessages));
       
-      // Broadcast message to other tabs
-      this.broadcastMessage(message);
+      console.log('💾 Message stored:', message);
+      console.log('💾 Total messages in storage:', existingMessages.length);
       
       // Trigger immediate update for current tab
       if (this.onMessageReceived) {
@@ -148,9 +148,15 @@ export class SimpleMessagingService {
   getMessages(): SimpleMessage[] {
     const allMessages = this.getStoredMessages();
     // Show ALL messages where current user is involved (sender or receiver)
-    return allMessages.filter(msg => 
+    const userMessages = allMessages.filter(msg => 
       msg.senderId === this.currentUserId || msg.receiverId === this.currentUserId
     ).sort((a, b) => a.timestamp - b.timestamp);
+    
+    console.log('📋 Current user:', this.currentUserId);
+    console.log('📋 All messages:', allMessages);
+    console.log('📋 User messages:', userMessages);
+    
+    return userMessages;
   }
 
   // Get conversation messages between two users
@@ -174,12 +180,12 @@ export class SimpleMessagingService {
   private checkForNewMessages(): void {
     const messages = this.getStoredMessages();
     const newMessages = messages.filter(msg => 
-      msg.receiverId === this.currentUserId && 
-      msg.timestamp > (Date.now() - 5000) // Messages from last 5 seconds
+      (msg.receiverId === this.currentUserId || msg.senderId === this.currentUserId) && 
+      msg.timestamp > (Date.now() - 10000) // Messages from last 10 seconds
     );
 
     newMessages.forEach(message => {
-      console.log('📨 New simple message received:', message);
+      console.log('📨 Checking message:', message);
       
       // Call message handler
       const handler = this.messageHandlers.get(message.type);
