@@ -87,6 +87,11 @@ export class SimpleMessagingService {
         if (message.type === 'new_message' && message.data) {
           console.log('📨 Received broadcast message:', message.data);
           
+          // Store the message in localStorage if it's for this user
+          if (message.data.receiverId === this.currentUserId || message.data.senderId === this.currentUserId) {
+            this.storeMessage(message.data);
+          }
+          
           // Trigger message handlers
           const handler = this.messageHandlers.get(message.data.type);
           if (handler) {
@@ -135,9 +140,10 @@ export class SimpleMessagingService {
   // Get messages for current user
   getMessages(): SimpleMessage[] {
     const allMessages = this.getStoredMessages();
+    // Show ALL messages where current user is involved (sender or receiver)
     return allMessages.filter(msg => 
       msg.senderId === this.currentUserId || msg.receiverId === this.currentUserId
-    );
+    ).sort((a, b) => a.timestamp - b.timestamp);
   }
 
   // Get conversation messages between two users
