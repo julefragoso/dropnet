@@ -18,6 +18,7 @@ export class SimpleMessagingService {
   private onMessageReceived?: (message: SimpleMessage) => void;
   private currentUserId: string = '';
   private storageKey = 'dropnet_simple_messages';
+  private broadcastChannel: BroadcastChannel | null = null;
 
   static getInstance(): SimpleMessagingService {
     if (!SimpleMessagingService.instance) {
@@ -30,6 +31,9 @@ export class SimpleMessagingService {
   initialize(userId: string): void {
     this.currentUserId = userId;
     console.log('📨 Simple messaging initialized for:', userId);
+    
+    // Initialize broadcast channel for cross-tab communication
+    this.initializeBroadcastChannel();
     
     // Start listening for messages
     this.startMessageListener();
@@ -65,8 +69,55 @@ export class SimpleMessagingService {
       }
       
       localStorage.setItem(this.storageKey, JSON.stringify(existingMessages));
+      
+      // Broadcast message to other tabs
+      this.broadcastMessage(message);
     } catch (error) {
       console.error('❌ Error storing simple message:', error);
+    }
+  }
+
+  // Initialize broadcast channel for cross-tab communication
+  private initializeBroadcastChannel(): void {
+    try {
+      this.broadcastChannel = new BroadcastChannel('dropnet_messages');
+      
+      this.broadcastChannel.onmessage = (event) => {
+        const message = event.data;
+        if (message.type === 'new_message' && message.data) {
+          console.log('📨 Received broadcast message:', message.data);
+          
+          // Trigger message handlers
+          const handler = this.messageHandlers.get(message.data.type);
+          if (handler) {
+            handler(message.data);
+          }
+          
+          // Trigger callback
+          if (this.onMessageReceived) {
+            this.onMessageReceived(message.data);
+          }
+        }
+      };
+      
+      console.log('📡 Broadcast channel initialized');
+    } catch (error) {
+      console.error('❌ Error initializing broadcast channel:', error);
+    }
+  }
+
+  // Broadcast message to other tabs
+  private broadcastMessage(message: SimpleMessage): void {
+    if (this.broadcastChannel) {
+      try {
+        this.broadcastChannel.postMessage({
+          type: 'new_message',
+          data: message
+        });
+        console.log('📡 Message broadcasted to other tabs');
+      } catch (error) {
+        console.error('❌ Error broadcasting message:', error);
+      }
     }
   }
 
