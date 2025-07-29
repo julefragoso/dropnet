@@ -72,6 +72,11 @@ export class SimpleMessagingService {
       
       // Broadcast message to other tabs
       this.broadcastMessage(message);
+      
+      // Trigger immediate update for current tab
+      if (this.onMessageReceived) {
+        this.onMessageReceived(message);
+      }
     } catch (error) {
       console.error('❌ Error storing simple message:', error);
     }
@@ -89,18 +94,20 @@ export class SimpleMessagingService {
           
           // Store the message in localStorage if it's for this user
           if (message.data.receiverId === this.currentUserId || message.data.senderId === this.currentUserId) {
-            this.storeMessage(message.data);
-          }
-          
-          // Trigger message handlers
-          const handler = this.messageHandlers.get(message.data.type);
-          if (handler) {
-            handler(message.data);
-          }
-          
-          // Trigger callback
-          if (this.onMessageReceived) {
-            this.onMessageReceived(message.data);
+            // Add to localStorage without triggering broadcast again
+            const existingMessages = this.getStoredMessages();
+            existingMessages.push(message.data);
+            
+            if (existingMessages.length > 100) {
+              existingMessages.splice(0, existingMessages.length - 100);
+            }
+            
+            localStorage.setItem(this.storageKey, JSON.stringify(existingMessages));
+            
+            // Trigger callback to update UI
+            if (this.onMessageReceived) {
+              this.onMessageReceived(message.data);
+            }
           }
         }
       };
