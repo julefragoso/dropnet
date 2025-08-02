@@ -17,6 +17,7 @@ import P2PTest from "./pages/P2PTest";
 import SecureMessagingTest from "./pages/SecureMessagingTest";
 import SimpleMessagingTest from "./pages/SimpleMessagingTest";
 import Debug from "./pages/Debug";
+import MessageDebug from "./pages/MessageDebug";
 import Panic from "./pages/Panic";
 import NotFound from "./pages/NotFound";
 
@@ -42,6 +43,7 @@ const App = () => (
           <Route path="/secure-messaging" element={<SecureMessagingTest />} />
           <Route path="/simple-messaging" element={<SimpleMessagingTest />} />
           <Route path="/debug" element={<Debug />} />
+          <Route path="/message-debug" element={<MessageDebug />} />
           <Route path="/files" element={<Dashboard />} />
           <Route path="/settings" element={<Dashboard />} />
           <Route path="/panic" element={<Panic />} />
